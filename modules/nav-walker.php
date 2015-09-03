@@ -25,6 +25,7 @@ class NavWalker extends \Walker_Nav_Menu {
   public function __construct() {
     add_filter('nav_menu_css_class', array($this, 'cssClasses'), 10, 2);
     add_filter('nav_menu_item_id', '__return_null');
+    add_filter('nav_menu_link_attributes', [$this, 'addAtts'], 10, 3);
     $cpt           = get_post_type();
     $this->cpt     = in_array($cpt, get_post_types(array('_builtin' => false)));
     $this->archive = get_post_type_archive_link($cpt);
@@ -55,8 +56,21 @@ class NavWalker extends \Walker_Nav_Menu {
     parent::display_element($element, $children_elements, $max_depth, $depth, $args, $output);
   }
   // @codingStandardsIgnoreEnd
+  
+  // @codingStandardsIgnoreStart  (The function we need to override isn't camelcased)
+  /**
+   * Overload Walker_Nav_Menu::start_lvl to add the 'dropdown-menu' class
+   * so sub-menu items work with Bootstrap out of the box.
+   */
+  public function start_lvl(&$output, $depth = 0, $args = []) {
+    parent::start_lvl($output, $depth, $args);
+    $args->link_before = '';
+    $args->link_after = '';
+    $output = preg_replace('/sub-menu/', 'sub-menu dropdown-menu', $output);
+  }
+  // @codingStandardsIgnoreEnd
 
-  public function cssClasses($classes, $item) {
+  public function cssClasses($classes, $item, $args) {
     $slug = sanitize_title($item->title);
 
     if ($this->cpt) {
@@ -65,6 +79,10 @@ class NavWalker extends \Walker_Nav_Menu {
       if (Utils\url_compare($this->archive, $item->url)) {
         $classes[] = 'active';
       }
+    }
+    
+    if ($args->walker->has_children) {
+      $classes[] = 'dropdown';
     }
 
     $classes = preg_replace('/(current(-menu-|[-_]page[-_])(item|parent|ancestor))/', 'active', $classes);
@@ -78,6 +96,21 @@ class NavWalker extends \Walker_Nav_Menu {
       $element = trim($element);
       return !empty($element);
     });
+  }
+  
+  public function addAtts($atts, $item, $args) {
+    if ($args->walker->has_children && $item->menu_item_parent == 0) {
+      $atts = array_merge($atts, [
+        'class' => 'dropdown-toggle',
+        'data-toggle' => 'dropdown',
+        'role' => 'button',
+        'aria-expanded' => 'false',
+      ]);
+
+      $args->link_after = ' <span class="caret"></span>';
+    }
+
+    return $atts;
   }
 }
 
